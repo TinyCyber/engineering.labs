@@ -19,7 +19,7 @@ from gensim.models import KeyedVectors
 from gensim.scripts.glove2word2vec import glove2word2vec
 
 from preprocessing import preprocess, build_matrix
-from utils import file_exists, verify_checksum, run_subproc, dump_pds
+from utils import file_exists, verify_checksum, run_subproc, dump
 from config import (
     DATASET_FILE,
     CHECKSUMS,
@@ -57,12 +57,13 @@ async def main():
     if CHECKSUMS.get(checksum_key, None):
         need_rerun = False
         for f_name, checksum in CHECKSUMS.get(checksum_key).items():
-            if not verify_checksum(call_args.work_store_path / f_name, checksum):
+            f_path = call_args.work_store_path / f_name
+            if not file_exists(f_path) or not verify_checksum(f_path, checksum):
                 need_rerun = True
                 break
     if need_rerun:
-        datasets = preprocess_data(dataset_file_path, DATASET_SIZE, emb_file_path, call_args.train_size)
-        dump_pds(dump_root=call_args.work_store_path, pds=datasets)
+        objects_to_save = preprocess_data(dataset_file_path, DATASET_SIZE, emb_file_path, call_args.train_size)
+        dump(dump_root=call_args.work_store_path, objects=objects_to_save)
     else:
         logging.info(f"All checksums match run configuration, skipping preprocessing.")
 
@@ -115,23 +116,28 @@ async def get_embeddings(emb_arch_path: Path) -> Path:
 
 
 def preprocess_data(ds_path: Path, ds_size: int, emb_file: Path, train_size: float) -> Mapping[str, pd.DataFrame]:
-
+    logging.info(f"Starting data preprocessing with loading base dataset {str(ds_path)}.")
     full_dataset = pd.read_csv(ds_path,  compression='zip', header=0, sep=',', quotechar='"')
     dataset = full_dataset.loc[:ds_size, [X_COLUMN] + Y_COLUMNS]
 
     # Cleaning the data
+    logging.info(f"Cleaning data, leaving only {TOKENIZER_WORDS} unique words.")
     dataset["comment_text"] = dataset["comment_text"].progress_apply(lambda x: preprocess(x))
     tokenizer = Tokenizer(num_words=TOKENIZER_WORDS, filters='', lower=False)
+    logging.info(f"Fit tokenizer.")
     tokenizer.fit_on_texts(list(dataset['comment_text']))
 
+    logging.info(f"Loading embeddings.")
     word2vec_glove_file = get_tmpfile("glove.840B.300d.word2vec.txt")
     glove2word2vec(str(emb_file.resolve()), word2vec_glove_file)
     glove_model = KeyedVectors.load_word2vec_format(word2vec_glove_file)
 
+    logging.info(f"Building embedding matrix.")
     max_features = min(MAX_FEATURES, len(tokenizer.word_index))
     embedding_matrix, _ = build_matrix(tokenizer.word_index, glove_model, max_features)
 
     # Split the data into training and validation
+    logging.info(f"Splitting dataset on train and test parts.")
     mask = np.random.rand(len(dataset)) < train_size
     train_dataset = dataset[mask]
     test_dataset = dataset[~mask]
@@ -145,6 +151,7 @@ def preprocess_data(ds_path: Path, ds_size: int, emb_file: Path, train_size: flo
     y_aux_test = test_dataset[Y_COLUMNS]
 
     # word indexing: transform text token into sequence of indexes.
+    logging.info(f"Transforming texts.")
     x_train = tokenizer.texts_to_sequences(x_train)
     x_test = tokenizer.texts_to_sequences(x_test)
     # truncate or pad sequences to have the same length
@@ -158,6 +165,8 @@ def preprocess_data(ds_path: Path, ds_size: int, emb_file: Path, train_size: flo
         "y_aux_train.pkl": pd.DataFrame(y_aux_train),
         "y_test.pkl": pd.DataFrame(y_test),
         "y_aux_test.pkl": pd.DataFrame(y_aux_test),
+        "embeddings_matrix.pkl": pd.DataFrame(embedding_matrix),
+        "tokenizer.pkl": tokenizer,
     }
     return output
 

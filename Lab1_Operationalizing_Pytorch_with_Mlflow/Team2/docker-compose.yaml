@@ -14,7 +14,13 @@ services:
     volumes:
       - dataset_storage:/dataset_storage
       - work_store:/work_store
-    command: python data_loader.py
+    networks:
+      backend:
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+    command: python -u data_loader.py --log-level INFO
 
 networks:
   backend:

@@ -12,6 +12,8 @@ CHECKSUMS = {
         "x_test.pkl": "ee6027a2aaddcc1efc88ad742f1c0b69847b4cf3c2b59914e948619fda66bd4b",
         "y_test.pkl": "0b116f3a81e20a42f26c19ca7cf39720d8b0542a48993d361e303e26962ba6a0",
         "y_aux_test.pkl": "f2c116d67ba40aee8fbefd0627e1349c4463a0a2a2affc0847fb93d6bd008a09",
+        "embeddings_matrix.pkl": "2e0b100c6acd9d69eb613ed68974fef891b2725b7dc1b2e858aa95771f39f17f",
+        "tokenizer.pkl": "skip",
     }
 }
 DATASET_SIZE = 50000
