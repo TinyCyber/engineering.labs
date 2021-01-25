@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  data_loader:
+    container_name: data_loader
+    image: notox/data_loader
+    build:
+      context: data_loader
+    environment:
+      NOTOX_DATASET_NAME: jigsaw-unintended-bias-in-toxicity-classification
+      NOTOX_STORAGE_PATH: /dataset_storage
+      NOTOX_WORK_STORE: /work_store
+      NOTOX_RANDOM_SEED: 1
+    volumes:
+      - dataset_storage:/dataset_storage
+      - work_store:/work_store
+    networks:
+      backend:
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+    command: python -u data_loader.py --log-level INFO
+
+networks:
+  backend:
+
+volumes:
+  dataset_storage:
+  work_store:
